@@ -1,0 +1,31 @@
+{
+  "name": "workday-planner",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace @workday/contracts && npm run build --workspace @workday/planner && npm run build --workspace @workday/integrations && npm run build --workspace @workday/api && npm run build --workspace @workday/web",
+    "dev": "concurrently -n api,web -c blue,green \"npm run dev --workspace @workday/api\" \"npm run dev --workspace @workday/web\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "npm run build --workspace @workday/contracts && npm run build --workspace @workday/planner && npm run build --workspace @workday/integrations && npm run typecheck --workspace @workday/api && npm run typecheck --workspace @workday/web"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "$postcss"
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "concurrently": "^9.2.1",
+    "postcss": "^8.5.10",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
+  }
+}

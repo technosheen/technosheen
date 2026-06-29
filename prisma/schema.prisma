@@ -1,0 +1,59 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model SourceSnapshot {
+  id         String   @id @default(cuid())
+  source     String
+  externalId String
+  capturedAt DateTime @default(now())
+  payload    Json
+
+  @@unique([source, externalId, capturedAt])
+  @@index([source, capturedAt])
+}
+
+model PlannedBlock {
+  id              String   @id
+  issueKey        String
+  title           String
+  startsAt        DateTime
+  endsAt          DateTime
+  outlookEventId  String?
+  syncFingerprint String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model SyncRun {
+  id        String   @id @default(cuid())
+  startedAt DateTime @default(now())
+  endedAt   DateTime?
+  created   Int      @default(0)
+  updated   Int      @default(0)
+  skipped   Int      @default(0)
+  status    String
+}
+
+model Timesheet {
+  id           String           @id @default(cuid())
+  workDate     DateTime         @unique
+  totalMinutes Int
+  createdAt    DateTime         @default(now())
+  entries      TimesheetEntry[]
+}
+
+model TimesheetEntry {
+  id          String    @id @default(cuid())
+  timesheetId String
+  code        String
+  description String
+  minutes     Int
+  source      String
+  timesheet   Timesheet @relation(fields: [timesheetId], references: [id], onDelete: Cascade)
+}
