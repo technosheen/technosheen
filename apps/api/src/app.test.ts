@@ -10,7 +10,10 @@ describe("Fastify API", () => {
       PLANNER_USE_DEMO_DATA: true,
       PLANNER_TIME_ZONE: "America/New_York",
       PLANNER_WORKDAY_START: "09:00",
-      PLANNER_WORKDAY_END: "17:00"
+      PLANNER_WORKDAY_END: "17:00",
+      MICROSOFT_AUTH_MODE: "delegated",
+      MICROSOFT_TENANT_ID: "organizations",
+      MICROSOFT_ENABLE_TEAMS_CHANNELS: false
     });
     const app = await buildApp(services);
     const response = await app.inject({
@@ -40,7 +43,13 @@ describe("Fastify API", () => {
     });
     const app = await buildApp({
       createRundown: vi.fn(),
-      syncCalendar
+      syncCalendar,
+      microsoftAuth: {
+        getStatus: vi.fn(),
+        startDeviceLogin: vi.fn(),
+        getDeviceLoginStatus: vi.fn(),
+        disconnect: vi.fn()
+      }
     });
     const response = await app.inject({
       method: "POST",
@@ -64,5 +73,30 @@ describe("Fastify API", () => {
 
     expect(response.statusCode).toBe(200);
     expect(syncCalendar).toHaveBeenCalledOnce();
+  });
+
+  it("reports Microsoft connection state", async () => {
+    const app = await buildApp(buildPlannerServices({
+      PORT: 4000,
+      WEB_ORIGIN: "http://localhost:3000",
+      PLANNER_USE_DEMO_DATA: true,
+      PLANNER_TIME_ZONE: "America/New_York",
+      PLANNER_WORKDAY_START: "09:00",
+      PLANNER_WORKDAY_END: "17:00",
+      MICROSOFT_AUTH_MODE: "delegated",
+      MICROSOFT_TENANT_ID: "organizations",
+      MICROSOFT_ENABLE_TEAMS_CHANNELS: false
+    }));
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/auth/microsoft/status"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      mode: "demo",
+      status: "connected",
+      account: null
+    });
   });
 });

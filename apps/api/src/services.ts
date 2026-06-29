@@ -3,13 +3,18 @@ import {
   DemoJiraAdapter,
   DemoOutlookAdapter,
   DemoTeamsAdapter,
+  ClientCredentialTokenProvider,
+  DelegatedMicrosoftAuth,
   GraphClient,
   JiraAdapter,
   OutlookAdapter,
   TeamsAdapter,
   type JiraPort,
   type OutlookPort,
-  type TeamsPort
+  type TeamsPort,
+  type DeviceLogin,
+  type DeviceLoginStatus,
+  type MicrosoftAuthStatus
 } from "@workday/integrations";
 import { createDailyRundown } from "@workday/planner";
 import type { AppConfig } from "./config.js";
@@ -21,6 +26,12 @@ export interface PlannerServices {
     updated: number;
     skippedMeetings: number;
   }>;
+  microsoftAuth: {
+    getStatus(): Promise<MicrosoftAuthStatus>;
+    startDeviceLogin(): Promise<DeviceLogin>;
+    getDeviceLoginStatus(sessionId: string): DeviceLoginStatus;
+    disconnect(): Promise<void>;
+  };
 }
 
 export function buildPlannerServices(config: AppConfig): PlannerServices {
@@ -58,49 +69,94 @@ export function buildPlannerServices(config: AppConfig): PlannerServices {
         .filter((item) => item.kind === "work")
         .map(({ kind: _kind, ...block }) => block);
       return adapters.outlook.syncPlannerBlocks(blocks);
+    },
+    microsoftAuth: adapters.microsoftAuth
+  };
+}
+
+type AdapterSet = {
+  jira: JiraPort;
+  outlook: OutlookPort;
+  teams: TeamsPort;
+  microsoftAuth: PlannerServices["microsoftAuth"];
+};
+
+function demoAdapters(): AdapterSet {
+  return {
+    jira: new DemoJiraAdapter(),
+    outlook: new DemoOutlookAdapter(),
+    teams: new DemoTeamsAdapter(),
+    microsoftAuth: {
+      async getStatus() {
+        return { mode: "demo", status: "connected", account: null };
+      },
+      async startDeviceLogin() {
+        throw new Error("Microsoft sign-in is disabled while demo data is enabled.");
+      },
+      getDeviceLoginStatus() {
+        return { status: "failed", error: "Microsoft sign-in is disabled in demo mode." };
+      },
+      async disconnect() {}
     }
   };
 }
 
-function demoAdapters(): { jira: JiraPort; outlook: OutlookPort; teams: TeamsPort } {
-  return {
-    jira: new DemoJiraAdapter(),
-    outlook: new DemoOutlookAdapter(),
-    teams: new DemoTeamsAdapter()
-  };
-}
-
-function liveAdapters(config: AppConfig): {
-  jira: JiraPort;
-  outlook: OutlookPort;
-  teams: TeamsPort;
-} {
-  const required = [
-    config.JIRA_BASE_URL,
-    config.JIRA_EMAIL,
-    config.JIRA_API_TOKEN,
-    config.MICROSOFT_TENANT_ID,
-    config.MICROSOFT_CLIENT_ID,
-    config.MICROSOFT_CLIENT_SECRET,
-    config.MICROSOFT_USER_ID
-  ];
+function liveAdapters(config: AppConfig): AdapterSet {
+  const required = [config.JIRA_BASE_URL, config.JIRA_EMAIL, config.JIRA_API_TOKEN, config.MICROSOFT_CLIENT_ID];
   if (required.some((value) => !value)) {
-    throw new Error("Live integrations require all Jira and Microsoft Graph environment variables.");
+    throw new Error("Live integrations require Jira credentials and MICROSOFT_CLIENT_ID.");
   }
 
-  const graph = new GraphClient({
-    tenantId: config.MICROSOFT_TENANT_ID!,
-    clientId: config.MICROSOFT_CLIENT_ID!,
-    clientSecret: config.MICROSOFT_CLIENT_SECRET!
-  });
+  const delegatedAuth =
+    config.MICROSOFT_AUTH_MODE === "delegated"
+      ? new DelegatedMicrosoftAuth({
+          tenantId: config.MICROSOFT_TENANT_ID,
+          clientId: config.MICROSOFT_CLIENT_ID!,
+          ...(config.MICROSOFT_TOKEN_CACHE_PATH
+            ? { cachePath: config.MICROSOFT_TOKEN_CACHE_PATH }
+            : {})
+        })
+      : null;
+  if (config.MICROSOFT_AUTH_MODE === "client_credentials" && !config.MICROSOFT_CLIENT_SECRET) {
+    throw new Error("Client-credentials auth requires MICROSOFT_CLIENT_SECRET.");
+  }
+  const tokenProvider =
+    delegatedAuth ??
+    new ClientCredentialTokenProvider({
+      tenantId: config.MICROSOFT_TENANT_ID,
+      clientId: config.MICROSOFT_CLIENT_ID!,
+      clientSecret: config.MICROSOFT_CLIENT_SECRET!
+    });
+  const graph = new GraphClient({ tokenProvider });
+  const microsoftAuth: PlannerServices["microsoftAuth"] = delegatedAuth
+    ? delegatedAuth
+    : {
+        async getStatus() {
+          return { mode: "client_credentials", status: "connected", account: null };
+        },
+        async startDeviceLogin() {
+          throw new Error("Device sign-in is unavailable in client-credentials mode.");
+        },
+        getDeviceLoginStatus() {
+          return { status: "failed", error: "Device sign-in is unavailable." };
+        },
+        async disconnect() {}
+      };
   return {
     jira: new JiraAdapter({
       baseUrl: config.JIRA_BASE_URL!,
       email: config.JIRA_EMAIL!,
       apiToken: config.JIRA_API_TOKEN!
     }),
-    outlook: new OutlookAdapter({ graph, userId: config.MICROSOFT_USER_ID! }),
-    teams: new TeamsAdapter(graph, config.MICROSOFT_USER_ID!)
+    outlook: new OutlookAdapter({
+      graph,
+      ...(config.MICROSOFT_USER_ID ? { userId: config.MICROSOFT_USER_ID } : {})
+    }),
+    teams: new TeamsAdapter(graph, {
+      ...(config.MICROSOFT_USER_ID ? { userId: config.MICROSOFT_USER_ID } : {}),
+      includeChannels: config.MICROSOFT_ENABLE_TEAMS_CHANNELS
+    }),
+    microsoftAuth
   };
 }
 

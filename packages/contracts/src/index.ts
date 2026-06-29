@@ -96,6 +96,36 @@ export const CalendarSyncResponseSchema = z.object({
   skippedMeetings: z.number().int().nonnegative()
 });
 
+export const MicrosoftAuthStatusSchema = z.object({
+  mode: z.enum(["delegated", "client_credentials", "demo"]),
+  status: z.enum(["connected", "disconnected"]),
+  account: z
+    .object({
+      name: z.string().nullable(),
+      username: z.string()
+    })
+    .nullable()
+});
+
+export const MicrosoftDeviceLoginSchema = z.object({
+  sessionId: z.string(),
+  userCode: z.string(),
+  verificationUri: z.string().url(),
+  message: z.string(),
+  expiresIn: z.number().int().positive()
+});
+
+export const MicrosoftDeviceLoginStatusSchema = z.object({
+  status: z.enum(["pending", "connected", "failed"]),
+  account: z
+    .object({
+      name: z.string().nullable(),
+      username: z.string()
+    })
+    .optional(),
+  error: z.string().optional()
+});
+
 export type JiraIssue = z.infer<typeof JiraIssueSchema>;
 export type MailMessage = z.infer<typeof MailMessageSchema>;
 export type TeamsMessage = z.infer<typeof TeamsMessageSchema>;
@@ -105,3 +135,6 @@ export type ScheduleItem = z.infer<typeof ScheduleItemSchema>;
 export type TimesheetEntry = z.infer<typeof TimesheetEntrySchema>;
 export type DailyRundown = z.infer<typeof DailyRundownSchema>;
 export type CalendarSyncResponse = z.infer<typeof CalendarSyncResponseSchema>;
+export type MicrosoftAuthStatus = z.infer<typeof MicrosoftAuthStatusSchema>;
+export type MicrosoftDeviceLogin = z.infer<typeof MicrosoftDeviceLoginSchema>;
+export type MicrosoftDeviceLoginStatus = z.infer<typeof MicrosoftDeviceLoginStatusSchema>;

@@ -35,7 +35,7 @@ interface GraphCollection<T> {
 
 export interface OutlookAdapterOptions {
   graph: Pick<GraphClient, "request">;
-  userId: string;
+  userId?: string;
 }
 
 export class OutlookAdapter implements OutlookPort {
@@ -44,7 +44,9 @@ export class OutlookAdapter implements OutlookPort {
 
   constructor(options: OutlookAdapterOptions) {
     this.#graph = options.graph;
-    this.#userPath = `/users/${encodeURIComponent(options.userId)}`;
+    this.#userPath = options.userId
+      ? `/users/${encodeURIComponent(options.userId)}`
+      : "/me";
   }
 
   async listMeetings(start: string, end: string): Promise<Meeting[]> {

@@ -10,10 +10,16 @@ const ConfigSchema = z.object({
   JIRA_BASE_URL: z.string().url().optional(),
   JIRA_EMAIL: z.string().email().optional(),
   JIRA_API_TOKEN: z.string().min(1).optional(),
-  MICROSOFT_TENANT_ID: z.string().min(1).optional(),
+  MICROSOFT_AUTH_MODE: z.enum(["delegated", "client_credentials"]).default("delegated"),
+  MICROSOFT_TENANT_ID: z.string().min(1).default("organizations"),
   MICROSOFT_CLIENT_ID: z.string().min(1).optional(),
   MICROSOFT_CLIENT_SECRET: z.string().min(1).optional(),
-  MICROSOFT_USER_ID: z.string().min(1).optional()
+  MICROSOFT_USER_ID: z.string().min(1).optional(),
+  MICROSOFT_TOKEN_CACHE_PATH: z.string().min(1).optional(),
+  MICROSOFT_ENABLE_TEAMS_CHANNELS: z
+    .string()
+    .default("false")
+    .transform((value) => value === "true")
 });
 
 export type AppConfig = z.infer<typeof ConfigSchema>;

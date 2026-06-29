@@ -46,10 +46,21 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 h1 { font-size: clamp(26px, 3vw, 36px); letter-spacing: -0.035em; margin: 0; line-height: 1.1; }
 .topbar-actions { display: flex; align-items: center; gap: 10px; }
 .sync-status { color: var(--muted); font-size: 12px; max-width: 220px; text-align: right; }
+.connection-badge { color: var(--green); font-size: 11px; max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .button { border-radius: 7px; min-height: 40px; padding: 0 15px; border: 1px solid var(--border); font-weight: 650; font-size: 13px; cursor: pointer; }
+.button { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
 .button.primary { color: white; background: var(--cobalt); border-color: var(--cobalt); }
 .button.secondary { color: var(--ink); background: white; }
 .button:disabled { opacity: .48; cursor: not-allowed; }
+
+.microsoft-signin {
+  display: flex; align-items: center; gap: 18px; padding: 14px 16px; margin-bottom: 18px;
+  border: 1px solid #85aef0; border-radius: 9px; background: var(--cobalt-soft);
+}
+.microsoft-signin div { flex: 1; }
+.microsoft-signin strong, .microsoft-signin span { display: block; }
+.microsoft-signin span { color: var(--muted); margin-top: 4px; font-size: 12px; }
+.microsoft-signin code { padding: 8px 12px; border-radius: 6px; background: white; font-size: 17px; font-weight: 750; letter-spacing: .08em; }
 
 .summary-band {
   display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--border);
@@ -120,6 +131,7 @@ h1 { font-size: clamp(26px, 3vw, 36px); letter-spacing: -0.035em; margin: 0; lin
   .topbar { align-items: flex-start; flex-direction: column; }
   .topbar-actions { width: 100%; flex-wrap: wrap; }
   .sync-status { order: 3; width: 100%; text-align: left; }
+  .microsoft-signin { align-items: stretch; flex-direction: column; }
   .summary-band { grid-template-columns: 1fr 1fr; }
   .summary-band div:nth-child(3) { border-left: 0; border-top: 1px solid var(--border); }
   .summary-band div:nth-child(4) { border-top: 1px solid var(--border); }

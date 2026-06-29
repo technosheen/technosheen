@@ -3,7 +3,10 @@ import Fastify from "fastify";
 import {
   CalendarSyncRequestSchema,
   DailyRundownRequestSchema,
-  DailyRundownSchema
+  DailyRundownSchema,
+  MicrosoftAuthStatusSchema,
+  MicrosoftDeviceLoginSchema,
+  MicrosoftDeviceLoginStatusSchema
 } from "@workday/contracts";
 import type { PlannerServices } from "./services.js";
 
@@ -12,6 +15,27 @@ export async function buildApp(services: PlannerServices, webOrigin = "http://lo
   await app.register(cors, { origin: webOrigin });
 
   app.get("/health", async () => ({ status: "ok" }));
+
+  app.get("/api/auth/microsoft/status", async () =>
+    MicrosoftAuthStatusSchema.parse(await services.microsoftAuth.getStatus())
+  );
+
+  app.post("/api/auth/microsoft/device/start", async () =>
+    MicrosoftDeviceLoginSchema.parse(await services.microsoftAuth.startDeviceLogin())
+  );
+
+  app.get<{ Params: { sessionId: string } }>(
+    "/api/auth/microsoft/device/:sessionId",
+    async (request) =>
+      MicrosoftDeviceLoginStatusSchema.parse(
+        services.microsoftAuth.getDeviceLoginStatus(request.params.sessionId)
+      )
+  );
+
+  app.post("/api/auth/microsoft/disconnect", async () => {
+    await services.microsoftAuth.disconnect();
+    return { status: "disconnected" };
+  });
 
   app.post("/api/rundown/daily", async (request, reply) => {
     const parsed = DailyRundownRequestSchema.safeParse(request.body ?? {});

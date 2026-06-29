@@ -1,4 +1,5 @@
 import { fetchJson } from "./http.js";
+import type { AccessTokenProvider } from "./microsoft-auth.js";
 
 interface TokenResponse {
   access_token: string;
@@ -6,16 +7,13 @@ interface TokenResponse {
 }
 
 export interface GraphClientOptions {
-  tenantId: string;
-  clientId: string;
-  clientSecret: string;
+  tokenProvider: AccessTokenProvider;
   fetcher?: typeof fetch;
 }
 
 export class GraphClient {
   readonly #options: GraphClientOptions;
   readonly #fetcher: typeof fetch;
-  #token: { value: string; expiresAt: number } | undefined;
 
   constructor(options: GraphClientOptions) {
     this.#options = options;
@@ -23,7 +21,7 @@ export class GraphClient {
   }
 
   async request<T>(path: string, init: RequestInit = {}): Promise<T> {
-    const token = await this.#getToken();
+    const token = await this.#options.tokenProvider.getAccessToken();
     return fetchJson<T>(
       `https://graph.microsoft.com/v1.0${path}`,
       {
@@ -38,8 +36,27 @@ export class GraphClient {
       this.#fetcher
     );
   }
+}
 
-  async #getToken(): Promise<string> {
+export class ClientCredentialTokenProvider implements AccessTokenProvider {
+  readonly #options: {
+    tenantId: string;
+    clientId: string;
+    clientSecret: string;
+    fetcher: typeof fetch;
+  };
+  #token: { value: string; expiresAt: number } | undefined;
+
+  constructor(options: {
+    tenantId: string;
+    clientId: string;
+    clientSecret: string;
+    fetcher?: typeof fetch;
+  }) {
+    this.#options = { ...options, fetcher: options.fetcher ?? fetch };
+  }
+
+  async getAccessToken(): Promise<string> {
     if (this.#token && this.#token.expiresAt > Date.now() + 60_000) return this.#token.value;
     const body = new URLSearchParams({
       client_id: this.#options.clientId,
@@ -54,7 +71,7 @@ export class GraphClient {
         headers: { "content-type": "application/x-www-form-urlencoded" },
         body
       },
-      this.#fetcher
+      this.#options.fetcher
     );
     this.#token = {
       value: response.access_token,

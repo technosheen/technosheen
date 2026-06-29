@@ -1,7 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import type { DailyRundown, ScheduleItem } from "@workday/contracts";
+import { useEffect, useState, useTransition } from "react";
+import type {
+  DailyRundown,
+  MicrosoftAuthStatus,
+  MicrosoftDeviceLogin,
+  MicrosoftDeviceLoginStatus,
+  ScheduleItem
+} from "@workday/contracts";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 const APP_TIME_ZONE = process.env.NEXT_PUBLIC_PLANNER_TIME_ZONE ?? "America/New_York";
@@ -9,7 +15,50 @@ const APP_TIME_ZONE = process.env.NEXT_PUBLIC_PLANNER_TIME_ZONE ?? "America/New_
 export function PlannerDashboard({ dateLabel }: { dateLabel: string }) {
   const [rundown, setRundown] = useState<DailyRundown | null>(null);
   const [status, setStatus] = useState("Ready to build your day");
+  const [microsoft, setMicrosoft] = useState<MicrosoftAuthStatus | null>(null);
+  const [deviceLogin, setDeviceLogin] = useState<MicrosoftDeviceLogin | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    void refreshMicrosoftStatus();
+  }, []);
+
+  async function refreshMicrosoftStatus() {
+    const response = await fetch(`${API_URL}/api/auth/microsoft/status`);
+    if (response.ok) setMicrosoft((await response.json()) as MicrosoftAuthStatus);
+  }
+
+  async function connectMicrosoft() {
+    setStatus("Starting secure Microsoft sign-in…");
+    const response = await fetch(`${API_URL}/api/auth/microsoft/device/start`, { method: "POST" });
+    if (!response.ok) {
+      setStatus("Microsoft sign-in could not be started");
+      return;
+    }
+    const login = (await response.json()) as MicrosoftDeviceLogin;
+    setDeviceLogin(login);
+    setStatus("Complete sign-in with Microsoft");
+    void pollDeviceLogin(login.sessionId);
+  }
+
+  async function pollDeviceLogin(sessionId: string) {
+    for (let attempt = 0; attempt < 90; attempt += 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, 2_000));
+      const response = await fetch(`${API_URL}/api/auth/microsoft/device/${sessionId}`);
+      if (!response.ok) continue;
+      const result = (await response.json()) as MicrosoftDeviceLoginStatus;
+      if (result.status === "pending") continue;
+      if (result.status === "connected") {
+        setDeviceLogin(null);
+        setStatus(`Microsoft connected as ${result.account?.username ?? "your account"}`);
+        await refreshMicrosoftStatus();
+        return;
+      }
+      setStatus(result.error ?? "Microsoft sign-in failed");
+      return;
+    }
+    setStatus("Microsoft sign-in expired; start it again");
+  }
 
   async function loadRundown() {
     setStatus("Reviewing Jira, Outlook, and Teams…");
@@ -51,8 +100,20 @@ export function PlannerDashboard({ dateLabel }: { dateLabel: string }) {
             <h1>Plan the workday</h1>
           </div>
           <div className="topbar-actions">
+            {microsoft?.mode === "delegated" && microsoft.status === "disconnected" ? (
+              <button className="button secondary" onClick={connectMicrosoft}>
+                Connect Microsoft
+              </button>
+            ) : null}
+            {microsoft?.account ? (
+              <span className="connection-badge">Microsoft · {microsoft.account.username}</span>
+            ) : null}
             <span className="sync-status" aria-live="polite">{status}</span>
-            <button className="button secondary" onClick={loadRundown} disabled={isPending}>
+            <button
+              className="button secondary"
+              onClick={loadRundown}
+              disabled={isPending || microsoft?.status === "disconnected"}
+            >
               Generate rundown
             </button>
             <button className="button primary" onClick={syncCalendar} disabled={!rundown}>
@@ -61,6 +122,7 @@ export function PlannerDashboard({ dateLabel }: { dateLabel: string }) {
           </div>
         </header>
 
+        {deviceLogin ? <MicrosoftSignIn login={deviceLogin} /> : null}
         <Summary rundown={rundown} />
 
         <section className="planner-grid">
@@ -72,6 +134,26 @@ export function PlannerDashboard({ dateLabel }: { dateLabel: string }) {
         <Timesheet rundown={rundown} />
       </section>
     </main>
+  );
+}
+
+function MicrosoftSignIn({ login }: { login: MicrosoftDeviceLogin }) {
+  return (
+    <section className="microsoft-signin" aria-live="polite">
+      <div>
+        <strong>Connect your work Microsoft account</strong>
+        <span>Microsoft will ask for this one-time code. Credentials never pass through the planner.</span>
+      </div>
+      <code>{login.userCode}</code>
+      <a
+        className="button primary"
+        href={login.verificationUri}
+        target="_blank"
+        rel="noreferrer"
+      >
+        Open Microsoft sign-in
+      </a>
+    </section>
   );
 }
 

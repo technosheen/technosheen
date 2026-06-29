@@ -29,13 +29,13 @@ interface GraphChannel {
 export class TeamsAdapter implements TeamsPort {
   constructor(
     private readonly graph: Pick<GraphClient, "request">,
-    private readonly userId: string
+    private readonly options: { userId?: string; includeChannels?: boolean } = {}
   ) {}
 
   async listRecentMessages(since: string): Promise<TeamsMessage[]> {
     const [chatMessages, channelMessages] = await Promise.all([
       this.#listChatMessages(),
-      this.#listChannelMessages()
+      this.options.includeChannels ? this.#listChannelMessages() : Promise.resolve([])
     ]);
 
     return [...chatMessages, ...channelMessages]
@@ -52,7 +52,7 @@ export class TeamsAdapter implements TeamsPort {
 
   async #listChatMessages(): Promise<GraphChatMessage[]> {
     const chats = await this.graph.request<GraphCollection<GraphChat>>(
-      `/users/${encodeURIComponent(this.userId)}/chats?$top=25`
+      `${this.#userPath()}/chats?$top=25`
     );
     const results = await Promise.all(
       chats.value.map(async (chat) => {
@@ -67,7 +67,7 @@ export class TeamsAdapter implements TeamsPort {
 
   async #listChannelMessages(): Promise<GraphChatMessage[]> {
     const teams = await this.graph.request<GraphCollection<GraphTeam>>(
-      `/users/${encodeURIComponent(this.userId)}/joinedTeams`
+      `${this.#userPath()}/joinedTeams`
     );
     const byTeam = await Promise.all(
       teams.value.map(async (team) => {
@@ -86,6 +86,12 @@ export class TeamsAdapter implements TeamsPort {
       })
     );
     return byTeam.flat();
+  }
+
+  #userPath(): string {
+    return this.options.userId
+      ? `/users/${encodeURIComponent(this.options.userId)}`
+      : "/me";
   }
 }
 
