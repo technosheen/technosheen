@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition, type FormEvent } from "react";
 import type {
   DailyRundown,
+  DailyRundownRequest,
   MicrosoftAuthStatus,
   MicrosoftDeviceLogin,
   MicrosoftDeviceLoginStatus,
@@ -11,12 +12,17 @@ import type {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 const APP_TIME_ZONE = process.env.NEXT_PUBLIC_PLANNER_TIME_ZONE ?? "America/New_York";
+type Captures = DailyRundownRequest["captures"];
+type CaptureKind = "meeting" | "mail" | "teams";
+
+const EMPTY_CAPTURES: Captures = { meetings: [], mail: [], teams: [] };
 
 export function PlannerDashboard({ dateLabel }: { dateLabel: string }) {
   const [rundown, setRundown] = useState<DailyRundown | null>(null);
   const [status, setStatus] = useState("Ready to build your day");
   const [microsoft, setMicrosoft] = useState<MicrosoftAuthStatus | null>(null);
   const [deviceLogin, setDeviceLogin] = useState<MicrosoftDeviceLogin | null>(null);
+  const [captures, setCaptures] = useState<Captures>(EMPTY_CAPTURES);
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -61,11 +67,11 @@ export function PlannerDashboard({ dateLabel }: { dateLabel: string }) {
   }
 
   async function loadRundown() {
-    setStatus("Reviewing Jira, Outlook, and Teams…");
+    setStatus("Building from Jira and captured context…");
     const response = await fetch(`${API_URL}/api/rundown/daily`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({})
+      body: JSON.stringify({ captures })
     });
     if (!response.ok) {
       setStatus("Could not generate the rundown");
@@ -78,16 +84,24 @@ export function PlannerDashboard({ dateLabel }: { dateLabel: string }) {
     });
   }
 
-  async function syncCalendar() {
+  function exportTimesheet() {
     if (!rundown) return;
-    setStatus("Syncing planner-owned blocks…");
-    const response = await fetch(`${API_URL}/api/calendar/sync`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ schedule: rundown.schedule })
-    });
-    const result = (await response.json()) as { created: number; updated: number };
-    setStatus(`Outlook synced: ${result.created} created, ${result.updated} updated`);
+    const rows = [
+      ["Code", "Description", "Source", "Minutes"],
+      ...rundown.timesheet.entries.map((entry) => [
+        entry.code,
+        entry.description,
+        entry.source,
+        String(entry.minutes)
+      ])
+    ];
+    const csv = rows.map((row) => row.map(csvCell).join(",")).join("\n");
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    link.download = `workday-timesheet-${rundown.date}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    setStatus("Timesheet CSV exported");
   }
 
   return (
@@ -108,6 +122,9 @@ export function PlannerDashboard({ dateLabel }: { dateLabel: string }) {
             {microsoft?.account ? (
               <span className="connection-badge">Microsoft · {microsoft.account.username}</span>
             ) : null}
+            {microsoft?.mode === "manual" ? (
+              <span className="connection-badge">Explicit capture · no Microsoft access</span>
+            ) : null}
             <span className="sync-status" aria-live="polite">{status}</span>
             <button
               className="button secondary"
@@ -116,13 +133,14 @@ export function PlannerDashboard({ dateLabel }: { dateLabel: string }) {
             >
               Generate rundown
             </button>
-            <button className="button primary" onClick={syncCalendar} disabled={!rundown}>
-              Sync to Outlook
+            <button className="button primary" onClick={exportTimesheet} disabled={!rundown}>
+              Export timesheet
             </button>
           </div>
         </header>
 
         {deviceLogin ? <MicrosoftSignIn login={deviceLogin} /> : null}
+        <CaptureWorkspace captures={captures} onChange={setCaptures} />
         <Summary rundown={rundown} />
 
         <section className="planner-grid">
@@ -134,6 +152,145 @@ export function PlannerDashboard({ dateLabel }: { dateLabel: string }) {
         <Timesheet rundown={rundown} />
       </section>
     </main>
+  );
+}
+
+function CaptureWorkspace({
+  captures,
+  onChange
+}: {
+  captures: Captures;
+  onChange: (captures: Captures) => void;
+}) {
+  const [kind, setKind] = useState<CaptureKind>("meeting");
+  const [title, setTitle] = useState("");
+  const [person, setPerson] = useState("");
+  const [details, setDetails] = useState("");
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
+  const [captureError, setCaptureError] = useState("");
+  const captureCount = captures.meetings.length + captures.mail.length + captures.teams.length;
+
+  function addCapture(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const id = `capture:${crypto.randomUUID()}`;
+    if (kind === "meeting") {
+      const startDate = new Date(start);
+      const endDate = new Date(end);
+      if (
+        Number.isNaN(startDate.getTime()) ||
+        Number.isNaN(endDate.getTime()) ||
+        endDate <= startDate
+      ) {
+        setCaptureError("Choose a valid end time after the meeting starts.");
+        return;
+      }
+      onChange({
+        ...captures,
+        meetings: [
+          ...captures.meetings,
+          {
+            id,
+            title,
+            start: startDate.toISOString(),
+            end: endDate.toISOString(),
+            showAs: "busy"
+          }
+        ]
+      });
+    } else if (kind === "mail") {
+      onChange({
+        ...captures,
+        mail: [
+          ...captures.mail,
+          {
+            id,
+            subject: title,
+            sender: person || "Captured email",
+            preview: details,
+            receivedAt: new Date().toISOString()
+          }
+        ]
+      });
+    } else {
+      onChange({
+        ...captures,
+        teams: [
+          ...captures.teams,
+          {
+            id,
+            author: person || "Captured conversation",
+            content: details || title,
+            createdAt: new Date().toISOString()
+          }
+        ]
+      });
+    }
+    setCaptureError("");
+    setTitle("");
+    setPerson("");
+    setDetails("");
+    setStart("");
+    setEnd("");
+  }
+
+  return (
+    <section className="capture-panel" id="capture">
+      <div className="capture-intro">
+        <div>
+          <h2>Capture only what matters</h2>
+          <p>Add a meeting, email, or conversation explicitly. Nothing is scanned or retained after this page is closed.</p>
+        </div>
+        <strong>{captureCount} captured</strong>
+      </div>
+      <form className="capture-form" onSubmit={addCapture}>
+        <label>
+          Type
+          <select value={kind} onChange={(event) => setKind(event.target.value as CaptureKind)}>
+            <option value="meeting">Meeting</option>
+            <option value="mail">Email</option>
+            <option value="teams">Conversation</option>
+          </select>
+        </label>
+        <label>
+          {kind === "meeting" ? "Meeting title" : "Subject"}
+          <input value={title} onChange={(event) => setTitle(event.target.value)} required />
+        </label>
+        {kind === "meeting" ? (
+          <>
+            <label>
+              Starts
+              <input type="datetime-local" value={start} onChange={(event) => setStart(event.target.value)} required />
+            </label>
+            <label>
+              Ends
+              <input type="datetime-local" min={start} value={end} onChange={(event) => setEnd(event.target.value)} required />
+            </label>
+          </>
+        ) : (
+          <>
+            <label>
+              {kind === "mail" ? "Sender" : "Person or channel"}
+              <input value={person} onChange={(event) => setPerson(event.target.value)} />
+            </label>
+            <label className="capture-details">
+              Relevant detail
+              <input value={details} onChange={(event) => setDetails(event.target.value)} />
+            </label>
+          </>
+        )}
+        <button className="button secondary" type="submit">Add context</button>
+      </form>
+      {captureError ? <p className="capture-error" role="alert">{captureError}</p> : null}
+      {captureCount > 0 ? (
+        <div className="capture-list">
+          {captures.meetings.map((item) => <span key={item.id}>Meeting · {item.title}</span>)}
+          {captures.mail.map((item) => <span key={item.id}>Email · {item.subject}</span>)}
+          {captures.teams.map((item) => <span key={item.id}>Conversation · {item.author}</span>)}
+          <button type="button" onClick={() => onChange(EMPTY_CAPTURES)}>Clear</button>
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -165,7 +322,7 @@ function Sidebar() {
         <span>Workday<br /><strong>Planner</strong></span>
       </div>
       <nav aria-label="Primary">
-        {["Today", "Schedule", "Timesheet", "Integrations"].map((item, index) => (
+        {["Today", "Schedule", "Timesheet", "Capture"].map((item, index) => (
           <a key={item} href={`#${item.toLowerCase()}`} className={index === 0 ? "active" : ""}>
             <span aria-hidden="true">{["▣", "□", "◷", "◇"][index]}</span>{item}
           </a>
@@ -229,7 +386,7 @@ function Schedule({ rundown }: { rundown: DailyRundown | null }) {
   return (
     <section className="panel schedule-panel" id="schedule">
       <PanelHeader title="Day Schedule" meta="9 AM – 5 PM" />
-      <div className="legend"><span className="busy-key">Busy · Outlook</span><span className="free-key">Free · Planner</span></div>
+      <div className="legend"><span className="busy-key">Busy · Captured</span><span className="free-key">Free · Planner</span></div>
       <div className="timeline">
         <div className="time-axis">
           {["9 AM", "10 AM", "11 AM", "12 PM", "1 PM", "2 PM", "3 PM", "4 PM", "5 PM"].map((time) => <span key={time}>{time}</span>)}
@@ -323,4 +480,8 @@ function hourInTimeZone(value: string) {
     parts.filter((part) => part.type !== "literal").map((part) => [part.type, Number(part.value)])
   );
   return (values.hour ?? 0) + (values.minute ?? 0) / 60;
+}
+
+function csvCell(value: string) {
+  return `"${value.replaceAll('"', '""')}"`;
 }

@@ -21,7 +21,7 @@ export interface AccessTokenProvider {
 }
 
 export interface MicrosoftAuthStatus {
-  mode: "delegated" | "client_credentials" | "demo";
+  mode: "manual" | "delegated" | "client_credentials" | "demo";
   status: "connected" | "disconnected";
   account: { name: string | null; username: string } | null;
 }

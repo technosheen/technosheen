@@ -22,8 +22,8 @@ body {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 14px;
 }
-button, input { font: inherit; }
-button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid #84adff; outline-offset: 2px; }
+button, input, select { font: inherit; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #84adff; outline-offset: 2px; }
 
 .app-shell { min-height: 100vh; display: grid; grid-template-columns: 196px 1fr; }
 .sidebar {
@@ -46,7 +46,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 h1 { font-size: clamp(26px, 3vw, 36px); letter-spacing: -0.035em; margin: 0; line-height: 1.1; }
 .topbar-actions { display: flex; align-items: center; gap: 10px; }
 .sync-status { color: var(--muted); font-size: 12px; max-width: 220px; text-align: right; }
-.connection-badge { color: var(--green); font-size: 11px; max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.connection-badge { color: var(--green); font-size: 11px; white-space: nowrap; }
 .button { border-radius: 7px; min-height: 40px; padding: 0 15px; border: 1px solid var(--border); font-weight: 650; font-size: 13px; cursor: pointer; }
 .button { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
 .button.primary { color: white; background: var(--cobalt); border-color: var(--cobalt); }
@@ -61,6 +61,26 @@ h1 { font-size: clamp(26px, 3vw, 36px); letter-spacing: -0.035em; margin: 0; lin
 .microsoft-signin strong, .microsoft-signin span { display: block; }
 .microsoft-signin span { color: var(--muted); margin-top: 4px; font-size: 12px; }
 .microsoft-signin code { padding: 8px 12px; border-radius: 6px; background: white; font-size: 17px; font-weight: 750; letter-spacing: .08em; }
+
+.capture-panel {
+  margin-bottom: 18px; border: 1px solid var(--border); border-radius: 9px;
+  background: var(--surface); overflow: hidden;
+}
+.capture-intro { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 15px 17px; border-bottom: 1px solid var(--border); }
+.capture-intro h2 { margin: 0; font-size: 15px; }
+.capture-intro p { margin: 4px 0 0; color: var(--muted); font-size: 11px; }
+.capture-intro > strong { color: var(--green); font-size: 12px; white-space: nowrap; }
+.capture-form { display: grid; grid-template-columns: 120px minmax(180px, 1fr) minmax(170px, .8fr) minmax(170px, .8fr) auto; gap: 10px; align-items: end; padding: 14px 17px; }
+.capture-form label { display: grid; gap: 5px; color: var(--muted); font-size: 10px; font-weight: 650; text-transform: uppercase; letter-spacing: .035em; }
+.capture-form input, .capture-form select {
+  width: 100%; min-width: 0; height: 38px; padding: 0 10px; color: var(--ink);
+  background: white; border: 1px solid var(--border); border-radius: 6px; font-size: 12px;
+  text-transform: none; letter-spacing: normal;
+}
+.capture-list { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; padding: 0 17px 14px; }
+.capture-error { margin: -4px 17px 12px; color: var(--red); font-size: 11px; }
+.capture-list span { padding: 5px 8px; color: #344054; background: white; border: 1px solid var(--border); border-radius: 5px; font-size: 10px; }
+.capture-list button { margin-left: auto; color: var(--muted); background: transparent; border: 0; cursor: pointer; font-size: 11px; }
 
 .summary-band {
   display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--border);
@@ -116,6 +136,8 @@ h1 { font-size: clamp(26px, 3vw, 36px); letter-spacing: -0.035em; margin: 0; lin
 .timesheet footer strong { color: var(--ink); }
 
 @media (max-width: 1120px) {
+  .capture-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .capture-form .button { align-self: end; }
   .planner-grid { grid-template-columns: 1fr 1.15fr; }
   .actions-panel { grid-column: 1 / -1; }
   .actions-panel ul { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 18px; }
@@ -132,6 +154,8 @@ h1 { font-size: clamp(26px, 3vw, 36px); letter-spacing: -0.035em; margin: 0; lin
   .topbar-actions { width: 100%; flex-wrap: wrap; }
   .sync-status { order: 3; width: 100%; text-align: left; }
   .microsoft-signin { align-items: stretch; flex-direction: column; }
+  .capture-intro { align-items: flex-start; }
+  .capture-form { grid-template-columns: 1fr; }
   .summary-band { grid-template-columns: 1fr 1fr; }
   .summary-band div:nth-child(3) { border-left: 0; border-top: 1px solid var(--border); }
   .summary-band div:nth-child(4) { border-top: 1px solid var(--border); }

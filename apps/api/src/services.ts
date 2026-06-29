@@ -1,8 +1,10 @@
-import type { DailyRundown, ScheduleItem } from "@workday/contracts";
+import type {
+  DailyRundown,
+  DailyRundownRequest,
+  ScheduleItem
+} from "@workday/contracts";
 import {
   DemoJiraAdapter,
-  DemoOutlookAdapter,
-  DemoTeamsAdapter,
   ClientCredentialTokenProvider,
   DelegatedMicrosoftAuth,
   GraphClient,
@@ -20,7 +22,7 @@ import { createDailyRundown } from "@workday/planner";
 import type { AppConfig } from "./config.js";
 
 export interface PlannerServices {
-  createRundown(date?: string): Promise<DailyRundown>;
+  createRundown(input?: DailyRundownRequest): Promise<DailyRundown>;
   syncCalendar(schedule: ScheduleItem[]): Promise<{
     created: number;
     updated: number;
@@ -35,19 +37,24 @@ export interface PlannerServices {
 }
 
 export function buildPlannerServices(config: AppConfig): PlannerServices {
-  const adapters = config.PLANNER_USE_DEMO_DATA ? demoAdapters() : liveAdapters(config);
+  const jira = config.PLANNER_USE_DEMO_DATA
+    ? new DemoJiraAdapter()
+    : liveJiraAdapter(config);
+  const microsoft = microsoftAdapters(config);
 
   return {
-    async createRundown(date = new Date().toISOString().slice(0, 10)) {
+    async createRundown(input = { captures: { meetings: [], mail: [], teams: [] } }) {
+      const date = input.date ?? new Date().toISOString().slice(0, 10);
       const dayStart = zonedBoundary(date, config.PLANNER_WORKDAY_START, config.PLANNER_TIME_ZONE);
       const dayEnd = zonedBoundary(date, config.PLANNER_WORKDAY_END, config.PLANNER_TIME_ZONE);
       const since = new Date(new Date(dayStart).getTime() - 24 * 60 * 60_000).toISOString();
-      const [assignedIssues, recentlyUpdatedIssues, meetings, mail, teams] = await Promise.all([
-        adapters.jira.listActiveAssignedIssues(),
-        adapters.jira.listRecentlyUpdatedIssues(since),
-        adapters.outlook.listMeetings(dayStart, dayEnd),
-        adapters.outlook.listUnreadMail(since),
-        adapters.teams.listRecentMessages(since)
+      const [assignedIssues, recentlyUpdatedIssues, graphMeetings, graphMail, graphTeams] =
+        await Promise.all([
+          jira.listActiveAssignedIssues(),
+          jira.listRecentlyUpdatedIssues(since),
+          microsoft.outlook?.listMeetings(dayStart, dayEnd) ?? Promise.resolve([]),
+          microsoft.outlook?.listUnreadMail(since) ?? Promise.resolve([]),
+          microsoft.teams?.listRecentMessages(since) ?? Promise.resolve([])
       ]);
       const issues = [
         ...new Map(
@@ -57,9 +64,9 @@ export function buildPlannerServices(config: AppConfig): PlannerServices {
       return createDailyRundown({
         date,
         issues,
-        meetings,
-        mail,
-        teams,
+        meetings: mergeById(graphMeetings, input.captures.meetings),
+        mail: mergeById(graphMail, input.captures.mail),
+        teams: mergeById(graphTeams, input.captures.teams),
         dayStart,
         dayEnd
       });
@@ -68,50 +75,47 @@ export function buildPlannerServices(config: AppConfig): PlannerServices {
       const blocks = schedule
         .filter((item) => item.kind === "work")
         .map(({ kind: _kind, ...block }) => block);
-      return adapters.outlook.syncPlannerBlocks(blocks);
+      if (!microsoft.outlook) {
+        throw new Error("Calendar sync is disabled in explicit-capture mode.");
+      }
+      return microsoft.outlook.syncPlannerBlocks(blocks);
     },
-    microsoftAuth: adapters.microsoftAuth
+    microsoftAuth: microsoft.auth
   };
 }
 
-type AdapterSet = {
-  jira: JiraPort;
-  outlook: OutlookPort;
-  teams: TeamsPort;
-  microsoftAuth: PlannerServices["microsoftAuth"];
+type MicrosoftAdapters = {
+  outlook?: OutlookPort;
+  teams?: TeamsPort;
+  auth: PlannerServices["microsoftAuth"];
 };
 
-function demoAdapters(): AdapterSet {
-  return {
-    jira: new DemoJiraAdapter(),
-    outlook: new DemoOutlookAdapter(),
-    teams: new DemoTeamsAdapter(),
-    microsoftAuth: {
-      async getStatus() {
-        return { mode: "demo", status: "connected", account: null };
-      },
-      async startDeviceLogin() {
-        throw new Error("Microsoft sign-in is disabled while demo data is enabled.");
-      },
-      getDeviceLoginStatus() {
-        return { status: "failed", error: "Microsoft sign-in is disabled in demo mode." };
-      },
-      async disconnect() {}
-    }
-  };
-}
-
-function liveAdapters(config: AppConfig): AdapterSet {
-  const required = [config.JIRA_BASE_URL, config.JIRA_EMAIL, config.JIRA_API_TOKEN, config.MICROSOFT_CLIENT_ID];
-  if (required.some((value) => !value)) {
-    throw new Error("Live integrations require Jira credentials and MICROSOFT_CLIENT_ID.");
+function microsoftAdapters(config: AppConfig): MicrosoftAdapters {
+  if (config.MICROSOFT_AUTH_MODE === "manual") {
+    return {
+      auth: {
+        async getStatus() {
+          return { mode: "manual", status: "connected", account: null };
+        },
+        async startDeviceLogin() {
+          throw new Error("Microsoft sign-in is disabled in explicit-capture mode.");
+        },
+        getDeviceLoginStatus() {
+          return { status: "failed", error: "Microsoft sign-in is disabled." };
+        },
+        async disconnect() {}
+      }
+    };
   }
 
+  if (!config.MICROSOFT_CLIENT_ID) {
+    throw new Error("Microsoft integration requires MICROSOFT_CLIENT_ID.");
+  }
   const delegatedAuth =
     config.MICROSOFT_AUTH_MODE === "delegated"
       ? new DelegatedMicrosoftAuth({
           tenantId: config.MICROSOFT_TENANT_ID,
-          clientId: config.MICROSOFT_CLIENT_ID!,
+          clientId: config.MICROSOFT_CLIENT_ID,
           ...(config.MICROSOFT_TOKEN_CACHE_PATH
             ? { cachePath: config.MICROSOFT_TOKEN_CACHE_PATH }
             : {})
@@ -124,11 +128,11 @@ function liveAdapters(config: AppConfig): AdapterSet {
     delegatedAuth ??
     new ClientCredentialTokenProvider({
       tenantId: config.MICROSOFT_TENANT_ID,
-      clientId: config.MICROSOFT_CLIENT_ID!,
+      clientId: config.MICROSOFT_CLIENT_ID,
       clientSecret: config.MICROSOFT_CLIENT_SECRET!
     });
   const graph = new GraphClient({ tokenProvider });
-  const microsoftAuth: PlannerServices["microsoftAuth"] = delegatedAuth
+  const auth: PlannerServices["microsoftAuth"] = delegatedAuth
     ? delegatedAuth
     : {
         async getStatus() {
@@ -143,11 +147,6 @@ function liveAdapters(config: AppConfig): AdapterSet {
         async disconnect() {}
       };
   return {
-    jira: new JiraAdapter({
-      baseUrl: config.JIRA_BASE_URL!,
-      email: config.JIRA_EMAIL!,
-      apiToken: config.JIRA_API_TOKEN!
-    }),
     outlook: new OutlookAdapter({
       graph,
       ...(config.MICROSOFT_USER_ID ? { userId: config.MICROSOFT_USER_ID } : {})
@@ -156,8 +155,24 @@ function liveAdapters(config: AppConfig): AdapterSet {
       ...(config.MICROSOFT_USER_ID ? { userId: config.MICROSOFT_USER_ID } : {}),
       includeChannels: config.MICROSOFT_ENABLE_TEAMS_CHANNELS
     }),
-    microsoftAuth
+    auth
   };
+}
+
+function liveJiraAdapter(config: AppConfig): JiraPort {
+  const required = [config.JIRA_BASE_URL, config.JIRA_EMAIL, config.JIRA_API_TOKEN];
+  if (required.some((value) => !value)) {
+    throw new Error("Live Jira integration requires Jira credentials.");
+  }
+  return new JiraAdapter({
+    baseUrl: config.JIRA_BASE_URL!,
+    email: config.JIRA_EMAIL!,
+    apiToken: config.JIRA_API_TOKEN!
+  });
+}
+
+function mergeById<T extends { id: string }>(source: T[], captured: T[]): T[] {
+  return [...new Map([...source, ...captured].map((item) => [item.id, item])).values()];
 }
 
 export function zonedBoundary(date: string, time: string, timeZone: string): string {

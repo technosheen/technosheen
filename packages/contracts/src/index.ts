@@ -83,7 +83,14 @@ export const DailyRundownSchema = z.object({
 });
 
 export const DailyRundownRequestSchema = z.object({
-  date: z.string().date().optional()
+  date: z.string().date().optional(),
+  captures: z
+    .object({
+      meetings: z.array(MeetingSchema).default([]),
+      mail: z.array(MailMessageSchema).default([]),
+      teams: z.array(TeamsMessageSchema).default([])
+    })
+    .default({ meetings: [], mail: [], teams: [] })
 });
 
 export const CalendarSyncRequestSchema = z.object({
@@ -97,7 +104,7 @@ export const CalendarSyncResponseSchema = z.object({
 });
 
 export const MicrosoftAuthStatusSchema = z.object({
-  mode: z.enum(["delegated", "client_credentials", "demo"]),
+  mode: z.enum(["manual", "delegated", "client_credentials", "demo"]),
   status: z.enum(["connected", "disconnected"]),
   account: z
     .object({
@@ -138,3 +145,4 @@ export type CalendarSyncResponse = z.infer<typeof CalendarSyncResponseSchema>;
 export type MicrosoftAuthStatus = z.infer<typeof MicrosoftAuthStatusSchema>;
 export type MicrosoftDeviceLogin = z.infer<typeof MicrosoftDeviceLoginSchema>;
 export type MicrosoftDeviceLoginStatus = z.infer<typeof MicrosoftDeviceLoginStatusSchema>;
+export type DailyRundownRequest = z.infer<typeof DailyRundownRequestSchema>;
