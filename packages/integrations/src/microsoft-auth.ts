@@ -5,12 +5,6 @@ import {
   type AccountInfo,
   type IPublicClientApplication
 } from "@azure/msal-node";
-import {
-  DataProtectionScope,
-  Environment,
-  PersistenceCachePlugin,
-  PersistenceCreator
-} from "@azure/msal-node-extensions";
 
 export const DEFAULT_DELEGATED_SCOPES = [
   "openid",
@@ -161,6 +155,12 @@ export class DelegatedMicrosoftAuth implements AccessTokenProvider {
 async function createPublicClientApplication(
   options: DelegatedMicrosoftAuthOptions
 ): Promise<IPublicClientApplication> {
+  const {
+    DataProtectionScope,
+    Environment,
+    PersistenceCachePlugin,
+    PersistenceCreator
+  } = await import("@azure/msal-node-extensions");
   const home = Environment.getUserRootDirectory();
   if (!home && !options.cachePath) throw new Error("Unable to locate a secure token-cache path.");
   const cachePath =
