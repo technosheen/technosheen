@@ -14,6 +14,9 @@ packages/
   integrations/     Typed Jira and Microsoft Graph adapters
 prisma/
   schema.prisma     Snapshot, plan, sync-run, and timesheet persistence model
+plugins/
+  cinch-workday-brief/
+                    Codex plugin using approved connectors plus the planner MCP
 ```
 
 Dependencies point inward: adapters implement ports, the API composes use cases, and the planner package contains no network or framework code.
@@ -49,6 +52,23 @@ The dashboard supports:
 - No automatic writes to Outlook or timesheet software
 
 The typed Graph adapters remain optional for organizations that approve them. Set `MICROSOFT_AUTH_MODE=delegated` or `client_credentials` and configure the documented Microsoft variables in `.env`.
+
+## Codex connector mode
+
+`plugins/cinch-workday-brief` packages the preferred no-new-Entra-permissions
+workflow:
+
+1. Codex retrieves only the context selected through the user's existing,
+   organization-approved Outlook, Teams, Jira, and GitHub connectors.
+2. The plugin's read-only `generate_workday_plan` MCP tool sends that explicit
+   capture to `POST /api/rundown/daily`.
+3. The planner returns the deterministic schedule and exactly eight-hour
+   timesheet. It does not receive connector credentials and does not write to
+   Outlook or the timesheet system.
+
+Start the planner locally with `npm run dev`. The MCP tool defaults to
+`http://127.0.0.1:4000`; set `WORKDAY_PLANNER_API_URL` when the API runs
+elsewhere.
 
 ## API
 
@@ -100,6 +120,7 @@ curl -X POST http://localhost:4000/api/automation/daily \
 
 ```bash
 npm test
+npm run test:plugin
 npm run typecheck
 npm run build
 ```

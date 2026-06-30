@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "workday-planner": {
+      "command": "node",
+      "args": [
+        "./mcp/server.mjs"
+      ],
+      "cwd": ".",
+      "env_vars": [
+        "WORKDAY_PLANNER_API_URL"
+      ]
+    }
+  }
+}

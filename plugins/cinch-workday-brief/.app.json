@@ -1,0 +1,19 @@
+{
+  "apps": {
+    "atlassian-rovo": {
+      "id": "connector_692de805e3ec8191834719067174a384"
+    },
+    "outlook-email": {
+      "id": "connector_4aaab2856305417b993eca9a216aaf6e"
+    },
+    "outlook-calendar": {
+      "id": "connector_e6a7394682e24467ac68c60696f275a4"
+    },
+    "teams": {
+      "id": "connector_246af0940da3457da0e751171dc1ce60"
+    },
+    "github": {
+      "id": "connector_76869538009648d5b282a4bb21c3d157"
+    }
+  }
+}

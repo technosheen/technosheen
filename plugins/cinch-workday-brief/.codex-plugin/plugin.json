@@ -1,0 +1,34 @@
+{
+  "name": "cinch-workday-brief",
+  "version": "0.2.0",
+  "description": "Prepare a connector-backed Cinch workday plan and balanced timesheet without direct Microsoft Graph credentials.",
+  "author": {
+    "name": "Sean Mahoney"
+  },
+  "keywords": [
+    "cinch",
+    "workday",
+    "planner",
+    "jira",
+    "teams"
+  ],
+  "skills": "./skills/",
+  "apps": "./.app.json",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Cinch Workday Planner",
+    "shortDescription": "Turn approved Cinch signals into a daily plan.",
+    "longDescription": "Uses each user's approved Codex connectors to collect selected Outlook, Jira, Teams, and GitHub context, then sends that explicit capture to the local Workday Planner for deterministic scheduling and an exactly eight-hour timesheet. It does not require planner-owned Microsoft Graph credentials or write to Outlook.",
+    "developerName": "Sean Mahoney",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Read"
+    ],
+    "defaultPrompt": [
+      "Generate my Cinch workday plan.",
+      "Plan today from my approved Cinch sources.",
+      "Build today's schedule and eight-hour timesheet."
+    ]
+  }
+}
