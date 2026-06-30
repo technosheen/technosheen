@@ -21,13 +21,14 @@ export interface DailyInputs {
 }
 
 export function createDailyRundown(input: DailyInputs): DailyRundown {
+  const meetings = normalizeMeetingsToDay(input.meetings, input.dayStart, input.dayEnd);
   const priorities = rankIssues(input.issues, input.date);
-  const workBlocks = scheduleWork(priorities, input.meetings, {
+  const workBlocks = scheduleWork(priorities, meetings, {
     dayStart: input.dayStart,
     dayEnd: input.dayEnd
   });
   const schedule: ScheduleItem[] = [
-    ...input.meetings.map((meeting) => ({ ...meeting, kind: "meeting" as const })),
+    ...meetings.map((meeting) => ({ ...meeting, kind: "meeting" as const })),
     ...workBlocks.map((block) => ({ ...block, kind: "work" as const }))
   ].sort((a, b) => a.start.localeCompare(b.start));
 
@@ -44,11 +45,32 @@ export function createDailyRundown(input: DailyInputs): DailyRundown {
 
   return {
     date: input.date,
-    summary: `${priorities.length} active priorities, ${blockers.length} blockers, ${input.meetings.length} meetings, and ${workBlocks.length} protected focus blocks.`,
+    summary: `${priorities.length} active priorities, ${blockers.length} blockers, ${meetings.length} meetings, and ${workBlocks.length} protected focus blocks.`,
     priorities,
     blockers,
     actionItems,
     schedule,
     timesheet: generateTimesheet(schedule)
   };
+}
+
+export function normalizeMeetingsToDay(
+  meetings: Meeting[],
+  dayStart: string,
+  dayEnd: string
+): Meeting[] {
+  const startMs = new Date(dayStart).getTime();
+  const endMs = new Date(dayEnd).getTime();
+  return meetings.flatMap((meeting) => {
+    const meetingStartMs = new Date(meeting.start).getTime();
+    const meetingEndMs = new Date(meeting.end).getTime();
+    if (meetingEndMs <= startMs || meetingStartMs >= endMs) return [];
+    return [
+      {
+        ...meeting,
+        start: new Date(Math.max(meetingStartMs, startMs)).toISOString(),
+        end: new Date(Math.min(meetingEndMs, endMs)).toISOString()
+      }
+    ];
+  });
 }

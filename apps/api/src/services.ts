@@ -44,7 +44,7 @@ export function buildPlannerServices(config: AppConfig): PlannerServices {
 
   return {
     async createRundown(input = { captures: { meetings: [], mail: [], teams: [] } }) {
-      const date = input.date ?? new Date().toISOString().slice(0, 10);
+      const date = input.date ?? dateInTimeZone(new Date(), config.PLANNER_TIME_ZONE);
       const dayStart = zonedBoundary(date, config.PLANNER_WORKDAY_START, config.PLANNER_TIME_ZONE);
       const dayEnd = zonedBoundary(date, config.PLANNER_WORKDAY_END, config.PLANNER_TIME_ZONE);
       const since = new Date(new Date(dayStart).getTime() - 24 * 60 * 60_000).toISOString();
@@ -218,4 +218,19 @@ export function zonedBoundary(date: string, time: string, timeZone: string): str
   }
 
   return new Date(candidate).toISOString();
+}
+
+export function dateInTimeZone(date: Date, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date);
+  const values = Object.fromEntries(
+    parts
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value])
+  );
+  return `${values.year}-${values.month}-${values.day}`;
 }

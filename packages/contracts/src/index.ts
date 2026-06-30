@@ -86,7 +86,14 @@ export const DailyRundownRequestSchema = z.object({
   date: z.string().date().optional(),
   captures: z
     .object({
-      meetings: z.array(MeetingSchema).default([]),
+      meetings: z
+        .array(
+          MeetingSchema.refine(
+            (meeting) => new Date(meeting.end) > new Date(meeting.start),
+            { message: "Meeting end must be after its start." }
+          )
+        )
+        .default([]),
       mail: z.array(MailMessageSchema).default([]),
       teams: z.array(TeamsMessageSchema).default([])
     })

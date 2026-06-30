@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readConfig } from "./config.js";
-import { zonedBoundary } from "./services.js";
+import { dateInTimeZone, zonedBoundary } from "./services.js";
 
 describe("zonedBoundary", () => {
   it("converts Eastern daylight time to UTC", () => {
@@ -26,5 +26,11 @@ describe("zonedBoundary", () => {
     expect(config.MICROSOFT_CLIENT_ID).toBeUndefined();
     expect(config.PLANNER_AUTOMATION_TOKEN).toBeUndefined();
     expect(config.MICROSOFT_AUTH_MODE).toBe("manual");
+  });
+
+  it("uses the configured timezone when deriving a work date", () => {
+    const instant = new Date("2026-06-30T02:00:00.000Z");
+    expect(dateInTimeZone(instant, "America/New_York")).toBe("2026-06-29");
+    expect(dateInTimeZone(instant, "Asia/Tokyo")).toBe("2026-06-30");
   });
 });

@@ -90,6 +90,8 @@ curl -X POST http://localhost:4000/api/automation/daily \
 - `DTC-*` calendar title: `DTC | DTC-*`
 - Meetings and internal timesheet activity: `INT-58`
 - Captured meetings are immutable busy intervals.
+- Meetings outside the configured workday are ignored; boundary-crossing meetings are clipped to working hours.
+- The default rundown date is derived in `PLANNER_TIME_ZONE`, not UTC.
 - Planner work blocks are free and receive a 15-minute meeting buffer.
 - Priority scoring combines Jira priority, workflow status, due date, mentions, and blockers.
 - Timesheet generation includes meetings and Jira work, then balances remaining time to `INT-58` so the total is exactly eight hours.
