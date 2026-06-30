@@ -1,4 +1,4 @@
-# Cinch Workday Planner MCP App
+# TechnoTracker
 
 A stateless OpenAI Apps SDK application that turns explicitly selected Jira,
 Outlook, and Microsoft Teams context into a deterministic workday schedule and

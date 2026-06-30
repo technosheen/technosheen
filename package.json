@@ -1,9 +1,22 @@
 {
-  "name": "cinch-workday-planner-mcp",
+  "name": "technotracker",
   "version": "0.1.0",
+  "description": "A stateless OpenAI MCP workday planner with an embedded MCP UI.",
   "private": true,
   "type": "module",
   "main": "./dist/server/server.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/technosheen/technotracker.git"
+  },
+  "homepage": "https://github.com/technosheen/technotracker#readme",
+  "keywords": [
+    "openai",
+    "mcp",
+    "mcp-app",
+    "workday",
+    "timesheet"
+  ],
   "scripts": {
     "build": "npm run build:widget && npm run build:server",
     "build:server": "tsc -p tsconfig.server.json",

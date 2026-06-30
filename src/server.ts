@@ -14,7 +14,7 @@ import { z } from "zod";
 import { planExplicitWorkday } from "./plan-workday.js";
 
 const SERVER_VERSION = "0.1.0";
-const WIDGET_URI = "ui://cinch-workday-planner/dashboard.html";
+const WIDGET_URI = "ui://technotracker/dashboard.html";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const widgetPath = path.resolve(__dirname, "..", "widget", "index.html");
 
@@ -66,7 +66,7 @@ const jiraIssueSchema = z.object({
 
 export function createPlannerMcpServer(): McpServer {
   const server = new McpServer({
-    name: "cinch-workday-planner",
+    name: "technotracker",
     version: SERVER_VERSION
   });
 
@@ -130,7 +130,7 @@ export function createPlannerMcpServer(): McpServer {
         };
       } catch (error) {
         const message =
-          error instanceof Error ? error.message : "The Workday Planner request failed.";
+          error instanceof Error ? error.message : "The TechnoTracker request failed.";
         return {
           isError: true,
           content: [{ type: "text" as const, text: message }]
@@ -141,7 +141,7 @@ export function createPlannerMcpServer(): McpServer {
 
   registerAppResource(
     server,
-    "Cinch Workday Planner dashboard",
+    "TechnoTracker dashboard",
     WIDGET_URI,
     {
       mimeType: RESOURCE_MIME_TYPE,
@@ -170,7 +170,7 @@ export function createHttpApp() {
   app.get("/health", (_request, response) => {
     response.json({
       status: "ok",
-      name: "cinch-workday-planner",
+      name: "technotracker",
       version: SERVER_VERSION
     });
   });
@@ -221,6 +221,6 @@ const executedPath = process.argv[1] ? path.resolve(process.argv[1]) : "";
 if (executedPath === fileURLToPath(import.meta.url)) {
   const port = Number.parseInt(process.env.CHATGPT_APP_PORT ?? "8000", 10);
   createHttpApp().listen(port, () => {
-    console.log(`Cinch Workday Planner MCP listening on http://localhost:${port}/mcp`);
+    console.log(`TechnoTracker MCP listening on http://localhost:${port}/mcp`);
   });
 }

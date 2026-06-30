@@ -33,7 +33,7 @@ describe("Apps SDK MCP server", () => {
     expect(response).toContain('"name":"generate_workday_plan"');
     expect(response).toContain('"readOnlyHint":true');
     expect(response).toContain(
-      '"resourceUri":"ui://cinch-workday-planner/dashboard.html"'
+      '"resourceUri":"ui://technotracker/dashboard.html"'
     );
   });
 

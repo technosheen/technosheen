@@ -15,7 +15,7 @@ export function PlannerWidget() {
     preview ? previewRundown : null
   );
   const { app, error } = useApp({
-    appInfo: { name: "Cinch Workday Planner", version: "0.1.0" },
+    appInfo: { name: "TechnoTracker", version: "0.1.0" },
     capabilities: {},
     onAppCreated: (createdApp: McpApp) => {
       createdApp.ontoolresult = (result) => {
