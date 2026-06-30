@@ -1,35 +1,40 @@
-# Workday Planner MVP
+# Cinch Workday Planner MCP App
 
-AI-assisted workday planning across Jira and explicitly captured work context. The monorepo produces a concise daily rundown, deterministic conflict-free focus blocks, and an exactly eight-hour timesheet that the user can enter into their system of record.
+A stateless OpenAI Apps SDK application that turns explicitly selected Jira,
+Outlook, and Microsoft Teams context into a deterministic workday schedule and
+an exactly eight-hour timesheet. It exposes one read-only MCP tool and renders
+the result with MCP UI inside ChatGPT.
 
 ## Architecture
 
 ```text
-apps/
-  api/              Fastify HTTP API and application composition
-  chatgpt/          Apps SDK MCP server and embedded planner widget
-  web/              Next.js dashboard
-packages/
-  contracts/        Shared Zod request/response and domain schemas
-  planner/          Pure priority, scheduling, overlap, and timesheet logic
-  integrations/     Typed Jira and Microsoft Graph adapters
-prisma/
-  schema.prisma     Snapshot, plan, sync-run, and timesheet persistence model
-plugins/
-  cinch-workday-brief/
-                    Codex plugin using approved connectors plus the planner MCP
+src/
+  server.ts          Streamable HTTP MCP server and Apps SDK registrations
+  contracts.ts       Zod schemas and domain types
+  plan-workday.ts    Explicit-input planning use case
+  planner/           Priority, scheduling, overlap, and timesheet logic
+  widget/            React MCP UI bundled as one HTML resource
 ```
 
-Dependencies point inward: adapters implement ports, the API composes use cases, and the planner package contains no network or framework code.
+There is no standalone API, dashboard, database, connector adapter, or
+application credential store. ChatGPT retrieves context through the user's
+separately approved apps and passes only the selected data to
+`generate_workday_plan`.
 
-## Requirements
+## Behavior
 
-- Node.js 22+
-- npm 11+
-- Jira Cloud API token for live Jira access
-- No Microsoft administrator approval for the default explicit-capture mode
+- `HUB-*` work is titled `HUBSPOT | HUB-*`.
+- `DTC-*` work is titled `DTC | DTC-*`.
+- Meetings and internal time use `INT-58`.
+- Meetings are immutable busy intervals.
+- Generated work blocks are free and never overlap meetings.
+- Work blocks receive a 15-minute meeting buffer.
+- The timesheet always totals exactly 480 minutes.
+- The MCP tool is stateless, read-only, and performs no external writes.
 
-## Setup
+## Local development
+
+Requirements: Node.js 22+ and npm 11+.
 
 ```bash
 cp .env.example .env
@@ -37,120 +42,34 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). The API runs at [http://localhost:4000](http://localhost:4000).
+The MCP endpoint is `http://localhost:8000/mcp`. The local visual preview is
+`http://localhost:8000/preview?preview=1`.
 
-`PLANNER_USE_DEMO_DATA=true` is the safe default for Jira. Set it to `false` and provide Jira credentials for live priorities. Microsoft access is not required: users add only the meetings, emails, or conversations they want considered, then export the generated timesheet as CSV.
+## Connect to ChatGPT
 
-## Explicit capture (default)
+1. Run `npm run dev`.
+2. Expose port `8000` through an HTTPS development tunnel.
+3. Enable developer mode in ChatGPT.
+4. Add `https://<tunnel-host>/mcp` as an app.
+5. Add the organization-approved Jira, Outlook, and Teams apps to the same
+   conversation.
+6. Ask ChatGPT to gather the relevant context and generate a workday plan.
 
-`MICROSOFT_AUTH_MODE=manual` performs no mailbox scan, Teams scan, or calendar write. Captured context is sent with one rundown request and is not persisted by the MVP.
-
-The dashboard supports:
-
-- Explicit meeting, email, and conversation capture
-- On-demand plan generation
-- Exact eight-hour timesheet CSV export
-- No automatic writes to Outlook or timesheet software
-
-The typed Graph adapters remain optional for organizations that approve them. Set `MICROSOFT_AUTH_MODE=delegated` or `client_credentials` and configure the documented Microsoft variables in `.env`.
-
-## Codex connector mode
-
-`plugins/cinch-workday-brief` packages the preferred no-new-Entra-permissions
-workflow:
-
-1. Codex retrieves only the context selected through the user's existing,
-   organization-approved Outlook, Teams, Jira, and GitHub connectors.
-2. The plugin's read-only `generate_workday_plan` MCP tool sends that explicit
-   capture to `POST /api/rundown/daily`.
-3. The planner returns the deterministic schedule and exactly eight-hour
-   timesheet. It does not receive connector credentials and does not write to
-   Outlook or the timesheet system.
-
-Start the planner locally with `npm run dev`. The MCP tool defaults to
-`http://127.0.0.1:4000`; set `WORKDAY_PLANNER_API_URL` when the API runs
-elsewhere.
-
-## ChatGPT Apps SDK mode
-
-`apps/chatgpt` follows the official
-[Apps SDK examples](https://github.com/openai/openai-apps-sdk-examples) and
-exposes a stateless Streamable HTTP MCP endpoint at `/mcp`. Its
-`generate_workday_plan` tool is read-only and renders a compact schedule and
-timesheet widget inside ChatGPT.
-
-The ChatGPT app does not inherit another app's credentials. Add the
-organization-approved Teams, Outlook, and Jira apps plus this planner app to
-the same conversation; ChatGPT can select relevant source context and pass
-that explicit capture to the planner tool. The planner calls the pure
-deterministic domain package directly and holds no connector credentials.
-
-Build and run the local Apps SDK integration:
-
-```bash
-npm install
-npm run build
-npm run dev:chatgpt
-```
-
-Expose port `8000` through an HTTPS development tunnel, then add
-`https://<tunnel-host>/mcp` under ChatGPT developer mode. The planner API is
-not required for this mode, and no OpenAI API key is required for the MCP app
-itself.
-
-## API
-
-### `POST /api/rundown/daily`
-
-Optional body, including only context the user chose to capture:
-
-```json
-{
-  "date": "2026-06-29",
-  "captures": {
-    "meetings": [],
-    "mail": [],
-    "teams": []
-  }
-}
-```
-
-Returns `summary`, scored `priorities`, `blockers`, `actionItems`, a meeting-safe `schedule`, and an exactly 480-minute `timesheet`.
-
-### `POST /api/automation/daily`
-
-Uses the same request and response contract as `/api/rundown/daily`. Configure `PLANNER_AUTOMATION_TOKEN` and send it as `Authorization: Bearer <token>`. This enables Task Scheduler, cron, Shortcuts, or another user-controlled trigger without granting mailbox access.
-
-Example:
-
-```bash
-curl -X POST http://localhost:4000/api/automation/daily \
-  -H "Authorization: Bearer $PLANNER_AUTOMATION_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{}'
-```
-
-`POST /api/calendar/sync` and the Microsoft connection endpoints remain available only for optional managed Microsoft integrations; the default dashboard never calls them.
-
-## Scheduling rules
-
-- `HUB-*` calendar title: `HUBSPOT | HUB-*`
-- `DTC-*` calendar title: `DTC | DTC-*`
-- Meetings and internal timesheet activity: `INT-58`
-- Captured meetings are immutable busy intervals.
-- Meetings outside the configured workday are ignored; boundary-crossing meetings are clipped to working hours.
-- The default rundown date is derived in `PLANNER_TIME_ZONE`, not UTC.
-- Planner work blocks are free and receive a 15-minute meeting buffer.
-- Priority scoring combines Jira priority, workflow status, due date, mentions, and blockers.
-- Timesheet generation includes meetings and Jira work, then balances remaining time to `INT-58` so the total is exactly eight hours.
+The planner app does not inherit credentials from those apps and requires no
+OpenAI API key. It receives only tool arguments selected for the current call.
 
 ## Validation
 
 ```bash
 npm test
-npm run test:plugin
 npm run typecheck
 npm run build
+npm audit --omit=dev
 ```
 
-Tests cover title prefixes, overlap detection, meeting buffers, Outlook ownership/free-busy behavior, exact timesheet balancing, and both API acceptance routes.
+Tests cover prefix rules, priority scoring, overlap detection, meeting buffers,
+boundary clipping, free/busy behavior, and exact timesheet balancing.
+
+Implementation follows the
+[OpenAI Apps SDK documentation](https://developers.openai.com/apps-sdk) and
+[official Apps SDK examples](https://github.com/openai/openai-apps-sdk-examples).
