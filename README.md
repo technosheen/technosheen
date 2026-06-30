@@ -7,6 +7,7 @@ AI-assisted workday planning across Jira and explicitly captured work context. T
 ```text
 apps/
   api/              Fastify HTTP API and application composition
+  chatgpt/          Apps SDK MCP server and embedded planner widget
   web/              Next.js dashboard
 packages/
   contracts/        Shared Zod request/response and domain schemas
@@ -69,6 +70,33 @@ workflow:
 Start the planner locally with `npm run dev`. The MCP tool defaults to
 `http://127.0.0.1:4000`; set `WORKDAY_PLANNER_API_URL` when the API runs
 elsewhere.
+
+## ChatGPT Apps SDK mode
+
+`apps/chatgpt` follows the official
+[Apps SDK examples](https://github.com/openai/openai-apps-sdk-examples) and
+exposes a stateless Streamable HTTP MCP endpoint at `/mcp`. Its
+`generate_workday_plan` tool is read-only and renders a compact schedule and
+timesheet widget inside ChatGPT.
+
+The ChatGPT app does not inherit another app's credentials. Add the
+organization-approved Teams, Outlook, and Jira apps plus this planner app to
+the same conversation; ChatGPT can select relevant source context and pass
+that explicit capture to the planner tool. The planner calls the pure
+deterministic domain package directly and holds no connector credentials.
+
+Build and run the local Apps SDK integration:
+
+```bash
+npm install
+npm run build
+npm run dev:chatgpt
+```
+
+Expose port `8000` through an HTTPS development tunnel, then add
+`https://<tunnel-host>/mcp` under ChatGPT developer mode. The planner API is
+not required for this mode, and no OpenAI API key is required for the MCP app
+itself.
 
 ## API
 

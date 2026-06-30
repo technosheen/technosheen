@@ -1,0 +1,36 @@
+{
+  "name": "@workday/chatgpt",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/server/server.js",
+  "scripts": {
+    "build": "npm run build:widget && npm run build:server",
+    "build:server": "tsc -p tsconfig.server.json",
+    "build:widget": "vite build",
+    "dev": "npm run build:widget && tsx watch src/server.ts",
+    "start": "node dist/server/server.js",
+    "typecheck": "tsc -p tsconfig.server.json --noEmit && tsc -p tsconfig.widget.json --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/ext-apps": "^1.0.1",
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "@workday/contracts": "0.1.0",
+    "@workday/planner": "0.1.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.18",
+    "@types/express": "^5.0.3",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.0.4",
+    "tsx": "^4.20.6",
+    "vite": "^8.1.1",
+    "vite-plugin-singlefile": "^2.3.0"
+  }
+}
